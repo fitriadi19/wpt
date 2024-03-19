@@ -34,13 +34,18 @@ test_invalid_value("width",    "calc-size(any, size)");
 test_invalid_value("width",    "calc-size(any, fit-content)");
 test_invalid_value("width",    "calc-size(any, max-content)");
 test_invalid_value("width",    "calc-size(any, min-content)");
-test_valid_value("width",      "calc-size(any, calc-size(10px, sign(size) * size))");
-test_invalid_value("width",    "calc-size(any, calc-size(10px, sign(size) * size) * sign(size))");
+test_valid_value("width",      "calc-size(10px, sign(size) * size)");
+test_invalid_value("width",    "size");
+test_invalid_value("width",    "sign(size)");
+test_invalid_value("width",    "calc-size(any, calc-size(10px, sign(size) * size))");
+test_invalid_value("width",    "calc-size(any, calc-size(10px))");
 
 test_valid_value("width", "calc-size(30px, 25em)");
 test_valid_value("width", "calc-size(calc-size(any, 30px), 25em)");
 test_valid_value("width", "calc-size(calc-size(2in, 30px), 25em)", "calc-size(calc-size(192px, 30px), 25em)");
 test_valid_value("width", "calc-size(calc-size(min-content, 30px), 25em)");
 test_valid_value("width", "calc-size(calc-size(min-content, size), size)");
+
+test_invalid_value("height", "calc(12% + calc-size(any, 31%))");
 
 </script>

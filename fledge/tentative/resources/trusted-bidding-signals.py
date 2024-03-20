@@ -7,12 +7,13 @@ from fledge.tentative.resources import fledge_http_server_util
 # Script to generate trusted bidding signals. The response depends on the
 # keys and interestGroupNames - some result in entire response failures, others
 # affect only their own value. Keys are preferentially used over
-# interestGroupName, since keys are composible, but some tests need to cover
+# interestGroupName, since keys are compossible, but some tests need to cover
 # there being no keys.
 def main(request, response):
     hostname = None
     keys = None
     interestGroupNames = None
+    urlLength = len(request.url)
 
     # Manually parse query params. Can't use request.GET because it unescapes as well as splitting,
     # and commas mean very different things from escaped commas.
@@ -57,6 +58,7 @@ def main(request, response):
     contentType = "application/json"
     adAuctionAllowed = "true"
     dataVersion = None
+
     if keys:
         for key in keys:
             value = "default value"
@@ -110,6 +112,14 @@ def main(request, response):
                 value = request.GET.first(b"slotSize", b"not-found").decode("ASCII")
             elif key == "allSlotsRequestedSizes":
                 value = request.GET.first(b"allSlotsRequestedSizes", b"not-found").decode("ASCII")
+            elif key.startswith("max-trusted-signals-url-length:"):
+                # Read maximum length limit from bidding keys and return 414 if the request URL
+                # length is oversized.
+                value = int(key.split(':')[1])
+                if urlLength > value:
+                    response.status = (414, b"URI Too Long")
+                    break
+
             responseBody["keys"][key] = value
 
     if "data-version" in interestGroupNames:

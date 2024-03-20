@@ -16,7 +16,8 @@
 // META: variant=?51-55
 // META: variant=?56-60
 // META: variant=?61-65
-// META: variant=?66-last
+// META: variant=?66-70
+// META: variant=?71-last
 
 "use strict";
 
@@ -785,3 +786,85 @@ subsetTest(promise_test, async test => {
       auctionConfigOverrides,
       uuid);
 }, 'all-slots-requested-sizes trustedBiddingSignalsSlotSizeMode in a component auction');
+
+/////////////////////////////////////////////////////////////////////////////
+// maxTrustedBiddingSignalsURLLength tests
+/////////////////////////////////////////////////////////////////////////////
+
+// A single trusted bidding signals fetch request URL is around 180 characters long. Setting a
+// maximum allowed URL size of 100 for the trusted bidding signals server using
+// 'max-trusted-signals-url-length:100' will cause the server to return a 414 error (Request-URI Too Long).
+subsetTest(promise_test, async test => {
+  await runTrustedBiddingSignalsTest(
+      test,
+      `trustedBiddingSignals === null`,
+      { trustedBiddingSignalsKeys: ['max-trusted-signals-url-length:100'],
+        trustedBiddingSignalsURL: TRUSTED_BIDDING_SIGNALS_URL,
+        maxTrustedBiddingSignalsURLLength: 0 });
+}, 'Trusted bidding signals server rejects requests with oversized URL.');
+
+subsetTest(promise_test, async test => {
+  await runTrustedBiddingSignalsTest(
+      test,
+      `trustedBiddingSignals["max-trusted-signals-url-length:200"] === 200`,
+      { trustedBiddingSignalsKeys: ['max-trusted-signals-url-length:200'],
+        trustedBiddingSignalsURL: TRUSTED_BIDDING_SIGNALS_URL,
+        maxTrustedBiddingSignalsURLLength: 0 });
+}, 'Trusted bidding signals request works with a URL length limit set to 0.');
+
+subsetTest(promise_test, async test => {
+  await runTrustedBiddingSignalsTest(
+      test,
+      `trustedBiddingSignals["max-trusted-signals-url-length:200"] === 200`,
+      { trustedBiddingSignalsKeys: ['max-trusted-signals-url-length:200'],
+        trustedBiddingSignalsURL: TRUSTED_BIDDING_SIGNALS_URL,
+        maxTrustedBiddingSignalsURLLength: 1 });
+}, 'Trusted bidding signals request works with a URL length limit smaller than the URL length.');
+
+subsetTest(promise_test, async test => {
+  await runTrustedBiddingSignalsTest(
+      test,
+      `trustedBiddingSignals["max-trusted-signals-url-length:200"] === 200`,
+    {
+      trustedBiddingSignalsKeys: ['max-trusted-signals-url-length:200'],
+        trustedBiddingSignalsURL: TRUSTED_BIDDING_SIGNALS_URL,
+        maxTrustedBiddingSignalsURLLength: 1000 });
+}, 'Trusted bidding signals request works with a URL length limit larger than the URL length.');
+
+
+// A fetch request with two different bidding signals keys will have a URL length around 240 characters.
+// If two joined interest groups both have length limits set as 200, this will result in two different
+// fetch requests. Otherwise, trusted bidding signals server will reject the request with the combined URL.
+subsetTest(promise_test, async test => {
+  const uuid = generateUuid(test);
+
+  await Promise.all(
+      [ joinInterestGroup(
+          test, uuid,
+          { name: 'group 1',
+            trustedBiddingSignalsKeys: ['max-trusted-signals-url-length:200:group1'],
+            trustedBiddingSignalsURL: TRUSTED_BIDDING_SIGNALS_URL,
+            maxTrustedBiddingSignalsURLLength: 200,
+            biddingLogicURL: createBiddingScriptURL(
+                { generateBid:
+                    `if (trustedBiddingSignals["max-trusted-signals-url-length:200"] !== 200) {
+                       throw "unexpected trustedBiddingSignals";
+                     }
+                     return { bid: 5, render: interestGroup.ads[0].renderURL };`})}),
+        joinInterestGroup(
+          test, uuid,
+          { name: 'group 2',
+            trustedBiddingSignalsKeys: ['max-trusted-signals-url-length:200:group2'],
+            trustedBiddingSignalsURL: TRUSTED_BIDDING_SIGNALS_URL,
+            maxTrustedBiddingSignalsURLLength: 200,
+            biddingLogicURL: createBiddingScriptURL(
+                { generateBid:
+                    `if (trustedBiddingSignals["max-trusted-signals-url-length:200"] !== 200) {
+                       throw "unexpected trustedBiddingSignals";
+                     }
+                     return { bid: 10, render: interestGroup.ads[0].renderURL };`})})
+      ]
+  );
+
+  runBasicFledgeTestExpectingWinner(test, uuid);
+}, 'Trusted bidding signals splits the request if the combined URL length exceeds the limit of any interest group.');
